@@ -1,0 +1,82 @@
+name: Build Ladybird (macOS ARM64)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'   # daily @ 06:00 UTC
+
+env:
+  LADYBIRD_REPO: LadybirdBrowser/ladybird
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout meta repo
+        uses: actions/checkout@v4
+
+      - name: Install Homebrew dependencies
+        run: |
+          brew update >/dev/null
+          brew install autoconf autoconf-archive automake ccache cmake libtool nasm ninja pkg-config llvm@21
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ runner.os }}-
+
+      - name: Cache vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ladybird/Build/caches
+          key: vcpkg-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
+
+      - name: Clone Ladybird source
+        run: |
+          git clone --depth 1 https://github.com/${{ env.LADYBIRD_REPO }}.git ladybird
+          echo "LADYBIRD_COMMIT=$(cd ladybird && git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Build Ladybird
+        run: |
+          export CC=$(brew --prefix llvm)/bin/clang
+          export CXX=$(brew --prefix llvm)/bin/clang++
+          export CCACHE_DIR=$HOME/.cache/ccache
+          ./Meta/ladybird.py build
+        working-directory: ladybird
+
+      - name: Package .app bundle
+        run: |
+          cd ladybird/Build/release/bin
+          tar czf ../../../Ladybird-macOS-ARM64.tar.gz Ladybird.app/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ladybird-macOS-ARM64-${{ env.LADYBIRD_COMMIT }}
+          path: ladybird/Ladybird-macOS-ARM64.tar.gz
+          retention-days: 30
+
+      - name: Publish nightly release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="nightly"
+          RELEASE_NOTES="Ladybird commit: \`${{ env.LADYBIRD_COMMIT }}\`"
+
+          # Delete existing nightly tag & release, if any
+          gh release view "$TAG" --json tagName --jq .tagName 2>/dev/null && {
+            gh release delete "$TAG" -y
+            git tag -d "$TAG" 2>/dev/null || true
+            git push --delete origin "$TAG" 2>/dev/null || true
+          } || true
+
+          gh release create "$TAG" \
+            --title "Nightly build — $(date +%Y-%m-%d)" \
+            --notes "$RELEASE_NOTES" \
+            --prerelease \
+            ladybird/Ladybird-macOS-ARM64.tar.gz
