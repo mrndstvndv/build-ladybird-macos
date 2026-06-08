@@ -5,6 +5,9 @@ on:
   schedule:
     - cron: '0 6 * * *'   # daily @ 06:00 UTC
 
+permissions:
+  contents: write
+
 env:
   LADYBIRD_REPO: LadybirdBrowser/ladybird
 
@@ -41,17 +44,17 @@ jobs:
           git clone --depth 1 https://github.com/${{ env.LADYBIRD_REPO }}.git ladybird
           echo "LADYBIRD_COMMIT=$(cd ladybird && git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - name: Build Ladybird
+      - name: Build Ladybird (Distribution preset — static linking)
         run: |
           export CC=$(brew --prefix llvm)/bin/clang
           export CXX=$(brew --prefix llvm)/bin/clang++
           export CCACHE_DIR=$HOME/.cache/ccache
-          ./Meta/ladybird.py build
+          BUILD_PRESET=Distribution ./Meta/ladybird.py build
         working-directory: ladybird
 
       - name: Package .app bundle
         run: |
-          cd ladybird/Build/release/bin
+          cd ladybird/Build/distribution/bin
           tar czf ../../../Ladybird-macOS-ARM64.tar.gz Ladybird.app/
 
       - name: Upload artifact
