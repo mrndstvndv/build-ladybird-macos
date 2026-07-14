@@ -55,6 +55,7 @@ jobs:
       - name: Package .app bundle
         run: |
           cd ladybird/Build/distribution/bin
+          rm -f Ladybird.app/Contents/lib
           tar czf ../../../Ladybird-macOS-ARM64.tar.gz Ladybird.app/
 
       - name: Upload artifact
