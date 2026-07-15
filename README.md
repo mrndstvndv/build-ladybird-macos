@@ -11,7 +11,11 @@ Built **daily** via GitHub Actions — grab the latest `.tar.gz` from the [relea
    ```bash
    tar xzf Ladybird-macOS-ARM64.tar.gz
    ```
-3. Drag `Ladybird.app` to your **Applications** folder, or run directly:
+3. **Bypass macOS Gatekeeper**: Since these binaries are ad-hoc signed, macOS will flag the app as "damaged" upon download. Remove the quarantine flag by running:
+   ```bash
+   xattr -cr Ladybird.app
+   ```
+4. Drag `Ladybird.app` to your **Applications** folder, or run directly:
    ```bash
    open Ladybird.app
    ```
